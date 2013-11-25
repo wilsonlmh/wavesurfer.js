@@ -45,7 +45,7 @@ var WaveSurfer = {
         this.drawer.init(this.params);
 
         this.drawer.on('redraw', function () {
-            my.drawBuffer();
+            my.draw();
         });
 
         this.drawer.on('click', function (progress) {
@@ -70,6 +70,14 @@ var WaveSurfer = {
             my.restartAnimationLoop();
         });
 
+        this.backend.on('decoded', function (data) {
+            my.draw(data);
+        });
+
+        this.backend.on('ready', function () {
+            my.fireEvent('ready');
+        });
+
         this.backend.init(this.params);
     },
 
@@ -84,6 +92,34 @@ var WaveSurfer = {
             }
         };
         frame();
+    },
+
+    /**
+     * @returns {Float32Array} Array of peaks.
+     */
+    getPeaks: function (data, length, sampleStep) {
+        var sampleSize = Math.ceil(data.length / length);
+        sampleStep = sampleStep || ~~(sampleSize / 10);
+        var peaks = new Float32Array(length);
+        for (var i = 0; i < length; i++) {
+            var start = ~~(i * sampleSize);
+            var end = start + sampleSize;
+            var peak = 0;
+            for (var j = start; j < end; j += sampleStep) {
+                var value = data[j];
+                if (value > peak) {
+                    peak = value;
+                } else if (-value > peak) {
+                    peak = -value;
+                }
+            }
+            peaks[i] = peak;
+        }
+        return peaks;
+    },
+
+    load: function (url) {
+        this.backend.load(url);
     },
 
     playAt: function (percents) {
@@ -221,7 +257,7 @@ var WaveSurfer = {
         return [ position, duration ];
     },
 
-    drawBuffer: function () {
+    draw: function (data) {
         this.drawer.clear();
         this.drawer.progress(this.backend.getPlayedPercents());
         this.redrawMarks();
@@ -232,20 +268,7 @@ var WaveSurfer = {
             length = this.backend.getDuration() * this.params.minPxPerSec;
         }
 
-        var peaks = this.backend.getPeaks(length);
-        this.drawer.drawPeaks(peaks, length);
-    },
-
-    loadBuffer: function (data) {
-        var my = this;
-        this.pause();
-        this.backend.loadBuffer(data, function () {
-            my.clearMarks();
-            my.drawBuffer();
-            my.fireEvent('ready');
-        }, function () {
-            my.fireEvent('error', 'Error decoding audio');
-        });
+        this.drawer.drawPeaks(this.getPeaks(data, length), length);
     },
 
     onProgress: function (e) {
@@ -257,31 +280,6 @@ var WaveSurfer = {
             percentComplete = e.loaded / (e.loaded + 1000000);
         }
         this.fireEvent('loading', Math.round(percentComplete * 100), e.target);
-    },
-
-    /**
-     * Loads an audio file via XHR.
-     */
-    load: function (url) {
-        var my = this;
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.send();
-        xhr.responseType = 'arraybuffer';
-        xhr.addEventListener('progress', function (e) {
-            my.onProgress(e);
-        });
-        xhr.addEventListener('load', function (e) {
-            if (200 == xhr.status) {
-                my.loadBuffer(xhr.response);
-            } else {
-                my.fireEvent('error', 'Server response: ' + xhr.statusText);
-            }
-        });
-        xhr.addEventListener('error', function (e) {
-            my.fireEvent('error', 'Error loading audio');
-        });
-        this.empty();
     },
 
     /**

@@ -78,7 +78,7 @@ WaveSurfer.util.extend(WaveSurfer.Drawer.Canvas, {
         this.progressCc.beginPath();
         this.progressCc.moveTo(0, halfH);
         for (var i = 0; i < this.width; i++) {
-            var h = Math.round(peaks[i] * coef);
+            var h = Math.round(peaks[i] * coef) || 1;
             this.waveCc.lineTo(i, halfH + h);
             this.progressCc.lineTo(i, halfH + h);
         }
@@ -88,7 +88,7 @@ WaveSurfer.util.extend(WaveSurfer.Drawer.Canvas, {
         this.waveCc.moveTo(0, halfH);
         this.progressCc.moveTo(0, halfH);
         for (var i = 0; i < this.width; i++) {
-            var h = Math.round(peaks[i] * coef);
+            var h = Math.round(peaks[i] * coef) || 1;
             this.waveCc.lineTo(i, halfH - h);
             this.progressCc.lineTo(i, halfH - h);
         }

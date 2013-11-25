@@ -11,10 +11,9 @@ WaveSurfer.WebAudio = {
         }
         this.params = params;
         this.ac = params.audioContext || this.getAudioContext();
-        this.offlineAc = this.getOfflineAudioContext(this.ac.sampleRate);
 
         this.createVolumeNode();
-        this.createScriptNode();
+        //this.createScriptNode();
     },
 
     setFilter: function (filterNode) {
@@ -83,154 +82,80 @@ WaveSurfer.WebAudio = {
         return this.gainNode.gain.value;
     },
 
-    clearSource: function () {
-        this.source.disconnect();
-        this.source = null;
-    },
-
-    refreshBufferSource: function () {
-        this.source && this.clearSource();
-        this.source = this.ac.createBufferSource();
-        if (this.buffer) {
-            this.source.buffer = this.buffer;
-        }
-        this.source.connect(this.gainNode);
-    },
-
-    setBuffer: function (buffer) {
-        this.lastPause = 0;
-        this.lastStart = 0;
-        this.startTime = 0;
-        this.paused = true;
-        this.buffer = buffer;
-    },
-
     /**
-     * Decodes binary data and creates buffer source.
-     *
-     * @param {ArrayBuffer} arraybuffer Audio data.
-     * @param {Function} cb Callback on success.
-     * @param {Function} errb Callback on error.
+     * Create a media element source.
      */
-    loadBuffer: function (arraybuffer, cb, errb) {
+    load: function (url) {
         var my = this;
-        this.offlineAc.decodeAudioData(
-            arraybuffer,
-            function (buffer) {
-                my.setBuffer(buffer);
-                cb && cb(buffer);
-            },
-            errb
-        );
+        this.decode(url);
+
+        var audio = this.getAudioElement(url);
+        audio.addEventListener('canplay', function () {
+            my.source = my.ac.createMediaElementSource(audio);
+            my.source.connect(my.ac.destination);
+            my.fireEvent('ready');
+        });
     },
 
-    loadEmpty: function () {
-        this.setBuffer(null);
+    decode: function (url) {
+        var my = this;
+        var audio = this.getAudioElement(url);
+        audio.addEventListener('canplay', function () {
+            var ac =  new (
+                window.OfflineAudioContext || window.webkitOfflineAudioContext
+            )(1, audio.duration * my.ac.sampleRate, my.ac.sampleRate);
+            var source = ac.createMediaElementSource(audio);
+            source.connect(ac.destination);
+            ac.startRendering();
+            ac.addEventListener('complete', function (e) {
+                source.disconnect();
+                my.fireEvent('decoded', e.renderedBuffer.getChannelData(0));
+            });
+            audio.play();
+        });
+    },
+
+    getAudioElement: function (url) {
+        var audio = new Audio();
+        audio.autoplay = false;
+        audio.src = url;
+        return audio;
     },
 
     isPaused: function () {
-        return this.paused;
+        return !this.source || this.source.mediaElement.paused;
     },
 
     getDuration: function () {
-        return this.buffer ? this.buffer.duration : 0;
+        return this.source.mediaElement.duration;
     },
 
     /**
-     * Plays the loaded audio region.
-     *
-     * @param {Number} start Start offset in seconds,
-     * relative to the beginning of the track.
-     *
-     * @param {Number} end End offset in seconds,
-     * relative to the beginning of the track.
+     * Plays the audio.
      */
-    play: function (start, end) {
-        this.refreshBufferSource();
-
-        if (null == start) { start = this.getCurrentTime(); }
-        if (null == end) { end = this.getDuration(); }
-        if (start > end) {
-            start = 0;
+    play: function (start) {
+        if (start != null) {
+            this.source.mediaElement.currentTime = start;
         }
-
-        this.lastStart = start;
-        this.startTime = this.ac.currentTime;
-        this.paused = false;
-        this.scheduledPause = end;
-
-        if (this.source.start) {
-            this.source.start(0, start, end - start);
-        } else {
-            this.source.noteGrainOn(0, start, end - start);
-        }
-
+        this.source.mediaElement.play();
         this.fireEvent('play');
     },
 
     /**
-     * Pauses the loaded audio.
+     * Pauses the audio.
      */
     pause: function () {
-        this.lastPause = this.lastStart + (this.ac.currentTime - this.startTime);
-        this.paused = true;
-        if (this.source) {
-            if (this.source.stop) {
-                this.source.stop(0);
-            } else {
-                this.source.noteOff(0);
-            }
-            this.clearSource();
-        }
-
+        this.source.mediaElement.pause();
         this.fireEvent('pause');
-    },
-
-    /**
-     * @returns {Float32Array} Array of peaks.
-     */
-    getPeaks: function (length, sampleStep) {
-        var buffer = this.buffer;
-        var sampleSize = Math.ceil(buffer.length / length);
-        sampleStep = sampleStep || ~~(sampleSize / 10);
-        var channels = buffer.numberOfChannels;
-        var peaks = new Float32Array(length);
-
-        for (var c = 0; c < channels; c++) {
-            var chan = buffer.getChannelData(c);
-            for (var i = 0; i < length; i++) {
-                var start = ~~(i * sampleSize);
-                var end = start + sampleSize;
-                var peak = 0;
-                for (var j = start; j < end; j += sampleStep) {
-                    var value = chan[j];
-                    if (value > peak) {
-                        peak = value;
-                    } else if (-value > peak) {
-                        peak = -value;
-                    }
-                }
-                if (c > 1) {
-                    peaks[i] += peak / channels;
-                } else {
-                    peaks[i] = peak / channels;
-                }
-            }
-        }
-
-        return peaks;
     },
 
     getPlayedPercents: function () {
         var duration = this.getDuration();
-        return duration > 0 ? this.getCurrentTime() / duration : 0;
+        return (this.getCurrentTime() / duration) || 0;
     },
 
     getCurrentTime: function () {
-        if (this.isPaused()) {
-            return this.lastPause;
-        }
-        return this.lastStart + (this.ac.currentTime - this.startTime);
+        return this.source.mediaElement.currentTime;
     },
 
     audioContext: null,
@@ -241,16 +166,6 @@ WaveSurfer.WebAudio = {
             );
         }
         return WaveSurfer.WebAudio.audioContext;
-    },
-
-    offlineAudioContext: null,
-    getOfflineAudioContext: function (sampleRate) {
-        if (!WaveSurfer.WebAudio.offlineAudioContext) {
-            WaveSurfer.WebAudio.offlineAudioContext = new (
-                window.OfflineAudioContext || window.webkitOfflineAudioContext
-            )(1, 2, sampleRate);
-        }
-        return WaveSurfer.WebAudio.offlineAudioContext;
     }
 };
 

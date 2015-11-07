@@ -34,7 +34,7 @@ var WaveSurfer = {
         renderer      : 'Canvas',
         backend       : 'WebAudio',
         mediaType     : 'audio',
-        autoCenter    : true
+        progressPaging: 'autoCenter',
     },
 
     init: function (params) {

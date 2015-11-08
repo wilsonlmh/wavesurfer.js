@@ -172,12 +172,15 @@ WaveSurfer.Drawer = {
                     break;
                     case "autoScroll":
                         this.params.autoScrollRate = this.params.autoScrollRate || 1.0;
+                        var offset = Math.round(this.wrapper.clientWidth * this.params.autoScrollRate);
                         if (this.wrapper.scrollWidth * progress - this.wrapper.clientWidth > this.wrapper.scrollLeft) {
-                            this.wrapper.scrollLeft += this.wrapper.clientWidth * this.params.autoScrollRate;
+                            this.wrapper.scrollLeft += offset;
+                            this.fireEvent('scrollingForward', offset);
                             
                         }
                         if (this.wrapper.scrollLeft > this.wrapper.scrollWidth * progress) {
-                            this.wrapper.scrollLeft -= this.wrapper.clientWidth * this.params.autoScrollRate;
+                            this.wrapper.scrollLeft -= offset;
+                            this.fireEvent('scrollingBackward', offset);
                         }
                     break;
                     default: //nothing here

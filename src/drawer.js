@@ -165,7 +165,7 @@ WaveSurfer.Drawer = {
             this.lastPos = pos;
             
             if (this.params.scrollParent) {
-                switch (this.params.progressPaging) {
+                switch (this.params.progressType) {
                     case "autoCenter":
                         var newPos = ~~(this.wrapper.scrollWidth * progress);
                         this.recenterOnPosition(newPos);

@@ -34,7 +34,8 @@ var WaveSurfer = {
         renderer      : 'Canvas',
         backend       : 'WebAudio',
         mediaType     : 'audio',
-        progressPaging: 'autoCenter',
+        progressType  : 'autoCenter',
+        autoScrollRate: 1.0,
     },
 
     init: function (params) {

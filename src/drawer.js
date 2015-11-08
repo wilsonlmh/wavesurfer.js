@@ -163,10 +163,25 @@ WaveSurfer.Drawer = {
 
         if (pos < this.lastPos || pos - this.lastPos >= minPxDelta) {
             this.lastPos = pos;
-
-            if (this.params.scrollParent && this.params.autoCenter) {
-                var newPos = ~~(this.wrapper.scrollWidth * progress);
-                this.recenterOnPosition(newPos);
+            
+            if (this.params.scrollParent) {
+                switch (this.params.progressPaging) {
+                    case "autoCenter":
+                        var newPos = ~~(this.wrapper.scrollWidth * progress);
+                        this.recenterOnPosition(newPos);
+                    break;
+                    case "autoScroll":
+                        this.params.autoScrollRate = this.params.autoScrollRate || 1.0;
+                        if (this.wrapper.scrollWidth * progress - this.wrapper.clientWidth > this.wrapper.scrollLeft) {
+                            this.wrapper.scrollLeft += this.wrapper.clientWidth * this.params.autoScrollRate;
+                            
+                        }
+                        if (this.wrapper.scrollLeft > this.wrapper.scrollWidth * progress) {
+                            this.wrapper.scrollLeft -= this.wrapper.clientWidth * this.params.autoScrollRate;
+                        }
+                    break;
+                    default: //nothing here
+                }
             }
 
             this.updateProgress(progress);
